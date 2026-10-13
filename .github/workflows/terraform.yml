@@ -1,0 +1,70 @@
+name: Terraform
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'environments/**'
+      - 'modules/**'
+      - '.github/workflows/terraform.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - 'environments/**'
+      - 'modules/**'
+      - '.github/workflows/terraform.yml'
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [ prod ]
+
+    # Never run two plans/applies against the same state at once, and never
+    # cancel a running apply.
+    concurrency:
+      group: terraform-${{ matrix.environment }}
+      cancel-in-progress: false
+
+    permissions:
+      id-token: write      # needed for WIF
+      contents: read
+
+    defaults:
+      run:
+        working-directory: environments/${{ matrix.environment }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP via WIF
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_TF_SERVICE_ACCOUNT }}   # tf-realestate
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.9
+
+      - name: Terraform Format
+        run: terraform fmt -check -recursive ../..
+
+      - name: Terraform Init
+        run: terraform init -input=false
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        if: github.event_name == 'pull_request'
+        run: terraform plan -input=false -lock-timeout=5m
+
+      - name: Terraform Apply
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: terraform apply -auto-approve -input=false -lock-timeout=5m
