@@ -8,8 +8,30 @@ Terraform for the realestate system: everything it runs on in GCP.
 |---|---|
 | Project `realestate-<env>-NNNNNN` | Inside the `realestate` folder owned by root-infrastructure, linked to billing, no default network. |
 | Project APIs | artifactregistry, compute, iam, iamcredentials, run, secretmanager, servicenetworking, sqladmin (enabled up front for the resources that come later). |
+| Artifact Registry `containers` | Images for all realestate apps. Keeps the 10 newest, deletes others after 30 days. |
+| Cloud Run `realestate-api` | Public, 1 vCPU / 512Mi, scales 0–2, billed per request. Runs as its own SA `realestate-api` (no roles yet). |
+| SA `deploy-realestate-api` | `sysdev-se/realestate-api` impersonates it via WIF to push images and deploy `realestate-api`. Nothing else. |
 
-Cloud Run services, the database and the network come in later changes.
+The database and the network come in later changes.
+
+## Deploying an app
+
+Terraform creates each Cloud Run service with Google's placeholder image and then
+ignores the image: **app repos own the image, this repo owns everything else**
+(env vars, scaling, IAM).
+
+The app repo needs these secrets:
+
+| Secret | Value |
+|---|---|
+| `GCP_WIF_PROVIDER` | same as in this repo |
+| `GCP_SERVICE_ACCOUNT` | output `api_deployer_service_account` |
+
+Its workflow then pushes to `<output artifact_registry>/realestate-api:<sha>` and runs
+`gcloud run deploy realestate-api --image <image> --region asia-southeast1 --project realestate-prod-000001`.
+Pass only `--image`: any other setting (env vars, memory, labels, ...) would be
+reverted by the next `terraform apply`. For the same reason, don't use the
+`google-github-actions/deploy-cloudrun` action without `skip_default_labels: true`.
 
 ## Layout
 
