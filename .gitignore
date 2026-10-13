@@ -1,0 +1,37 @@
+# Terraform local state
+terraform.tfstate
+terraform.tfstate.backup
+*.tfstate
+*.tfstate.backup
+
+# Terraform directories
+.terraform/
+.terraform/*
+
+# Local overrides (environments/*/terraform.tfvars is committed: it holds IDs, not secrets)
+*.auto.tfvars
+*.auto.tfvars.json
+
+# Crash logs
+crash.log
+crash.*.log
+
+# Override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# IDE/editor
+# IntelliJ / IDEA
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+
+# macOS / Linux
+.DS_Store
+Thumbs.db
+
+.agents
