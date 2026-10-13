@@ -22,3 +22,13 @@ variable "billing_account" {
   description = "Billing account ID."
   type        = string
 }
+
+variable "wif_pool_name" {
+  description = "GitHub workload identity pool (root-infrastructure: terraform output wif_pool_name)."
+  type        = string
+}
+
+variable "all_users_ingress_tag_value" {
+  description = "allUsersIngress=True tag value (root-infrastructure: terraform output all_users_ingress_tag_value)."
+  type        = string
+}
