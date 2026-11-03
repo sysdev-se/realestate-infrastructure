@@ -11,6 +11,8 @@ Terraform for the realestate system: everything it runs on in GCP.
 | Artifact Registry `containers` | Images for all realestate apps. Keeps the 10 newest, deletes others after 30 days. |
 | Cloud Run `realestate-api` | Public, 1 vCPU / 512Mi, scales 0–2, billed per request. Runs as its own SA `realestate-api` (no roles yet). |
 | SA `deploy-realestate-api` | `sysdev-se/realestate-api` impersonates it via WIF to push images and deploy `realestate-api`. Nothing else. |
+| Cloud Run `realestate-web` | Public Nuxt SSR app, 1 vCPU / 512Mi, scales 0–2, billed per request. Runs as its own SA `realestate-web` (no roles). Gets `NUXT_PUBLIC_API_BASE` = the api's URL. |
+| SA `deploy-realestate-web` | `sysdev-se/realestate-web` impersonates it via WIF to push images and deploy `realestate-web`. Nothing else. |
 
 The database and the network come in later changes.
 
@@ -25,13 +27,19 @@ The app repo needs these secrets:
 | Secret | Value |
 |---|---|
 | `GCP_WIF_PROVIDER` | same as in this repo |
-| `GCP_SERVICE_ACCOUNT` | output `api_deployer_service_account` |
+| `GCP_SERVICE_ACCOUNT` | output `api_deployer_service_account` (realestate-api) or `web_deployer_service_account` (realestate-web) |
 
-Its workflow then pushes to `<output artifact_registry>/realestate-api:<sha>` and runs
-`gcloud run deploy realestate-api --image <image> --region asia-southeast1 --project realestate-prod-000001`.
+Its workflow then pushes to `<output artifact_registry>/<service>:<sha>` and runs
+`gcloud run deploy <service> --image <image> --region asia-southeast1 --project realestate-prod-000001`.
 Pass only `--image`: any other setting (env vars, memory, labels, ...) would be
 reverted by the next `terraform apply`. For the same reason, don't use the
-`google-github-actions/deploy-cloudrun` action without `skip_default_labels: true`.
+`google-github-actions/deploy-cloudrun` action without `skip_default_labels: true`,
+nor `gcloud run deploy --source` or `--allow-unauthenticated` (the deployer may not
+use Cloud Build or change IAM).
+
+A new public service's first apply usually fails on the `allUsers` grant ("do not
+belong to a permitted customer"): the `allUsersIngress` tag hasn't propagated to the
+org policy yet. Re-run the failed job.
 
 ## Layout
 

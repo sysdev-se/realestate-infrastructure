@@ -75,3 +75,42 @@ module "api_deployer" {
   cloud_run_service            = module.api.name
   runtime_service_account_id   = module.api.runtime_service_account_id
 }
+
+module "web" {
+  source = "../../modules/cloud-run-service"
+
+  project_id     = module.project.project_id
+  project_number = module.project.project_number
+  region         = var.region
+  name           = "realestate-web"
+  labels         = local.labels
+
+  # Smallest useful size: scales to zero and is billed only while serving requests.
+  cpu           = "1"
+  memory        = "512Mi"
+  min_instances = 0
+  max_instances = 2
+
+  # Read by Nuxt at runtime as runtimeConfig.public.apiBase.
+  env = {
+    NUXT_PUBLIC_API_BASE = module.api.uri
+  }
+
+  public                      = true
+  all_users_ingress_tag_value = var.all_users_ingress_tag_value
+}
+
+# realestate-web's GitHub workflow impersonates this to push images and deploy.
+module "web_deployer" {
+  source = "../../modules/github-deployer"
+
+  project_id                   = module.project.project_id
+  account_id                   = "deploy-realestate-web"
+  github_repository            = "sysdev-se/realestate-web"
+  wif_pool_name                = var.wif_pool_name
+  artifact_registry_location   = google_artifact_registry_repository.containers.location
+  artifact_registry_repository = google_artifact_registry_repository.containers.repository_id
+  cloud_run_location           = var.region
+  cloud_run_service            = module.web.name
+  runtime_service_account_id   = module.web.runtime_service_account_id
+}
