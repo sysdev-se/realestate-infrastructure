@@ -4,6 +4,11 @@ locals {
     environment = var.environment
     managed-by  = "terraform"
   }
+
+  # Cloud Run's deterministic URL (https://<service>-<project number>.<region>.run.app),
+  # known without reading the service. Used where reading it would create a cycle:
+  # the api's CORS reads realestate-web's URLs, so the web can't read the api's.
+  api_url = "https://realestate-api-${module.project.project_number}.${var.region}.run.app"
 }
 
 module "project" {
@@ -57,6 +62,11 @@ module "api" {
   min_instances = 0
   max_instances = 2
 
+  # Browsers may call the api from realestate-web, under either of its run.app URLs.
+  env = {
+    CORS_ALLOWED_ORIGINS = join(",", module.web.urls)
+  }
+
   # JWT signing keys and the seeded admin's password, see secrets.tf.
   secret_env = {
     for name, secret in google_secret_manager_secret.api : name => secret.secret_id
@@ -101,7 +111,7 @@ module "web" {
 
   # Read by Nuxt at runtime as runtimeConfig.public.apiBase.
   env = {
-    NUXT_PUBLIC_API_BASE = module.api.uri
+    NUXT_PUBLIC_API_BASE = local.api_url
   }
 
   public                      = true

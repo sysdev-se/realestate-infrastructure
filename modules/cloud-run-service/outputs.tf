@@ -8,6 +8,11 @@ output "uri" {
   value       = google_cloud_run_v2_service.this.uri
 }
 
+output "urls" {
+  description = "All https://*.run.app URLs of the service (deterministic and legacy)."
+  value       = google_cloud_run_v2_service.this.urls
+}
+
 output "runtime_service_account_id" {
   description = "Fully qualified ID of the runtime service account."
   value       = google_service_account.runtime.id
