@@ -4,7 +4,8 @@
 #
 # - ACCESS_TOKEN_SECRET / REFRESH_TOKEN_SECRET: HS256 JWT signing keys (the app
 #   requires >= 32 bytes each).
-# - ADMIN_PASSWORD: password of the admin user the app seeds at startup. Read it with
+# - ADMIN_PASSWORD: password of the admin user the app seeds at startup. Readable by
+#   local.admin_password_readers:
 #   `gcloud secrets versions access latest --secret realestate-api-admin-password`.
 #   Alphanumeric only, so it pastes safely into JSON and shells.
 #
@@ -29,6 +30,11 @@ locals {
       version   = 1
     }
   }
+
+  # People who may read the admin password (folder editors can't read secret values).
+  admin_password_readers = [
+    "user:systemadmin@sysdev.se",
+  ]
 }
 
 ephemeral "random_password" "api" {
@@ -62,14 +68,11 @@ resource "google_secret_manager_secret_version" "api" {
   secret_data_wo_version = each.value.version
 }
 
-# Renamed from api_jwt (RE-11) when ADMIN_PASSWORD was added; keeps the existing
-# JWT secrets instead of recreating them (which would log everyone out).
-moved {
-  from = google_secret_manager_secret.api_jwt
-  to   = google_secret_manager_secret.api
-}
+resource "google_secret_manager_secret_iam_member" "admin_password_reader" {
+  for_each = toset(local.admin_password_readers)
 
-moved {
-  from = google_secret_manager_secret_version.api_jwt
-  to   = google_secret_manager_secret_version.api
+  project   = module.project.project_id
+  secret_id = google_secret_manager_secret.api["ADMIN_PASSWORD"].secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = each.value
 }
