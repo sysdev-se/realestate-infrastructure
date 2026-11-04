@@ -57,8 +57,16 @@ module "api" {
   min_instances = 0
   max_instances = 2
 
+  # JWT signing keys, see secrets.tf.
+  secret_env = {
+    for name, secret in google_secret_manager_secret.api_jwt : name => secret.secret_id
+  }
+
   public                      = true
   all_users_ingress_tag_value = var.all_users_ingress_tag_value
+
+  # A revision referencing a secret with no version fails to start.
+  depends_on = [google_secret_manager_secret_version.api_jwt]
 }
 
 # realestate-api's GitHub workflow impersonates this to push images and deploy.
