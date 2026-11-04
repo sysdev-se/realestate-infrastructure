@@ -46,7 +46,8 @@ org policy yet. Re-run the failed job.
 
 `environments/<env>/secrets.tf` generates each secret with an ephemeral `random_password` and
 writes it through `secret_data_wo`, so the value is never in state, plans or logs. Nobody
-needs to know the JWT keys. The admin password (user `rikard.virta@sysdev.se`) you read with:
+needs to know the JWT keys. The admin password (user `rikard.virta@sysdev.se`) can be read by
+the people in `local.admin_password_readers` (folder editors can't read secret values):
 
 ```sh
 gcloud secrets versions access latest --secret realestate-api-admin-password --project realestate-prod-000001
