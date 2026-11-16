@@ -74,10 +74,9 @@ resource "google_cloud_scheduler_job" "this" {
   schedule  = var.schedule
   time_zone = var.time_zone
 
-  # A failed run is not retried by the scheduler; the next scheduled run picks up what it missed.
-  retry_config {
-    retry_count = 0
-  }
+  # No retry_config: the default (retry_count 0) means a failed start is not retried; the next
+  # scheduled run picks up what it missed. Setting it explicitly only causes a permanent diff,
+  # since the API doesn't return an all-default retry_config.
 
   http_target {
     http_method = "POST"

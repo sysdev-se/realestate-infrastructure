@@ -30,13 +30,6 @@ resource "google_cloud_run_v2_service_iam_member" "developer" {
   member   = "serviceAccount:${google_service_account.this.email}"
 }
 
-# Keeps the existing services' grants in place (no destroy/create gap that could fail a
-# deploy running during the apply). Remove after RE-22 has been applied.
-moved {
-  from = google_cloud_run_v2_service_iam_member.developer
-  to   = google_cloud_run_v2_service_iam_member.developer[0]
-}
-
 resource "google_cloud_run_v2_job_iam_member" "developer" {
   count = var.cloud_run_job != null ? 1 : 0
 
