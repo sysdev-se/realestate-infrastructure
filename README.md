@@ -7,7 +7,7 @@ Terraform for the realestate system: everything it runs on in GCP.
 | Resource | Notes |
 |---|---|
 | Project `realestate-<env>-NNNNNN` | Inside the `realestate` folder owned by root-infrastructure, linked to billing, no default network. |
-| Project APIs | artifactregistry, compute, iam, iamcredentials, run, secretmanager, servicenetworking, sqladmin, storage (servicenetworking and sqladmin are enabled up front for the database that comes later). |
+| Project APIs | artifactregistry, cloudscheduler, compute, iam, iamcredentials, run, secretmanager, servicenetworking, sqladmin, storage (servicenetworking and sqladmin are enabled up front for the database that comes later). |
 | Artifact Registry `containers` | Images for all realestate apps. Keeps the 10 newest, deletes others after 30 days. |
 | Cloud Run `realestate-api` | Public, 1 vCPU / 512Mi, scales 0–2, billed per request. Runs as its own SA `realestate-api`, which can only read its own secrets. Gets `ACCESS_TOKEN_SECRET`, `REFRESH_TOKEN_SECRET` and `ADMIN_PASSWORD` from Secret Manager, `CORS_ALLOWED_ORIGINS` = both of realestate-web's run.app URLs, and `IMAGE_BUCKET`. |
 | Bucket `realestate-<env>-NNNNNN-listing-images` | Listing images uploaded through realestate-api, which alone can read/write/delete them (`storage.objectUser`) and serves them. Private (org policy). **Objects are deleted after ~1 day** (demo data), no soft delete. |
@@ -15,6 +15,9 @@ Terraform for the realestate system: everything it runs on in GCP.
 | SA `deploy-realestate-api` | `sysdev-se/realestate-api` impersonates it via WIF to push images and deploy `realestate-api`. Nothing else. |
 | Cloud Run `realestate-web` | Public Nuxt SSR app, 1 vCPU / 512Mi, scales 0–2, billed per request. Runs as its own SA `realestate-web` (no roles). Gets `NUXT_PUBLIC_API_BASE` = the api's deterministic URL (`https://realestate-api-<project number>.<region>.run.app`, computed so the api can read the web's URLs without a cycle). |
 | SA `deploy-realestate-web` | `sysdev-se/realestate-web` impersonates it via WIF to push images and deploy `realestate-web`. Nothing else. |
+| Cloud Run job `realestate-scraper-<source>` per entry in `local.scrapers` (`scrapers.tf`; today `fazwaz`) | 1 vCPU / 512Mi, 30 min timeout, no retries. Runs as its own SA `realestate-scraper-<source>`, which has no roles; realestate-api accepts its Google ID tokens because its email is in the api's `SCRAPER_ACCOUNTS` (`<source>=<email>`, audience `SCRAPER_AUDIENCE` = the api's URL). Env: `API_BASE_URL`, `START_URL`, `MAX_PAGES`. |
+| Cloud Scheduler job `realestate-scraper-<source>` | Starts the Cloud Run job on its schedule (fazwaz: 03:00 Asia/Ho_Chi_Minh) as the job's SA, which may run that job only (`run.invoker`). |
+| SA `deploy-scraper-<source>` | The scraper's repo (e.g. `sysdev-se/realestate-scraper-fazwaz`) impersonates it via WIF to push images and update its job. Nothing else. |
 
 The database and the network come in later changes (parked: `.agents/RE-3/cloud-sql-notes.md`).
 
@@ -29,10 +32,11 @@ The app repo needs these secrets:
 | Secret | Value |
 |---|---|
 | `GCP_WIF_PROVIDER` | same as in this repo |
-| `GCP_SERVICE_ACCOUNT` | output `api_deployer_service_account` (realestate-api) or `web_deployer_service_account` (realestate-web) |
+| `GCP_SERVICE_ACCOUNT` | output `api_deployer_service_account` (realestate-api), `web_deployer_service_account` (realestate-web) or `scraper_deployer_service_accounts["<source>"]` (a scraper) |
 
 Its workflow then pushes to `<output artifact_registry>/<service>:<sha>` and runs
-`gcloud run deploy <service> --image <image> --region asia-southeast1 --project realestate-prod-000001`.
+`gcloud run deploy <service> --image <image> --region asia-southeast1 --project realestate-prod-000001`
+(a scraper: `gcloud run jobs update <job> --image <image> ...`).
 Pass only `--image`: any other setting (env vars, memory, labels, ...) would be
 reverted by the next `terraform apply`. For the same reason, don't use the
 `google-github-actions/deploy-cloudrun` action without `skip_default_labels: true`,
@@ -42,6 +46,15 @@ use Cloud Build or change IAM).
 A new public service's first apply usually fails on the `allUsers` grant ("do not
 belong to a permitted customer"): the `allUsersIngress` tag hasn't propagated to the
 org policy yet. Re-run the failed job.
+
+## Scrapers
+
+One Cloud Run job per scraped website, each from its own (private) repo, so they deploy
+independently. To add one: add an entry to `local.scrapers` in `environments/prod/scrapers.tf`
+(repo, schedule, env), merge, then give the new repo the `GCP_WIF_PROVIDER` and
+`GCP_SERVICE_ACCOUNT` secrets. The api picks up the new account through `SCRAPER_ACCOUNTS`; no
+api code changes. Until the repo deploys its first image the job runs Google's placeholder
+image (harmless).
 
 ## Secrets
 

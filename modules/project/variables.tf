@@ -29,6 +29,7 @@ variable "enabled_apis" {
   type        = list(string)
   default = [
     "artifactregistry.googleapis.com",
+    "cloudscheduler.googleapis.com",
     "compute.googleapis.com",
     "iam.googleapis.com",
     "iamcredentials.googleapis.com",

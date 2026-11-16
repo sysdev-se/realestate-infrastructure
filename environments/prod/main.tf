@@ -63,9 +63,13 @@ module "api" {
   max_instances = 2
 
   # Browsers may call the api from realestate-web, under either of its run.app URLs.
+  # Scrapers (scrapers.tf) authenticate with Google ID tokens for this audience; the api
+  # accepts only the listed SAs, as source=email pairs.
   env = {
     CORS_ALLOWED_ORIGINS = join(",", module.web.urls)
     IMAGE_BUCKET         = google_storage_bucket.images.name
+    SCRAPER_AUDIENCE     = local.api_url
+    SCRAPER_ACCOUNTS     = join(",", [for source, scraper in module.scraper : "${source}=${scraper.runtime_service_account_email}"])
   }
 
   # JWT signing keys and the seeded admin's password, see secrets.tf.
