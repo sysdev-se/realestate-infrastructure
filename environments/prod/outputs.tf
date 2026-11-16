@@ -32,3 +32,8 @@ output "web_deployer_service_account" {
   description = "Set as GCP_SERVICE_ACCOUNT in sysdev-se/realestate-web."
   value       = module.web_deployer.email
 }
+
+output "scraper_deployer_service_accounts" {
+  description = "Set as GCP_SERVICE_ACCOUNT in each scraper's repo (scrapers.tf)."
+  value       = { for source, deployer in module.scraper_deployer : source => deployer.email }
+}

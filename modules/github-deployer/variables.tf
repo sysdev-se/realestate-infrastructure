@@ -29,13 +29,25 @@ variable "artifact_registry_repository" {
 }
 
 variable "cloud_run_location" {
-  description = "Region of the Cloud Run service."
+  description = "Region of the Cloud Run service or job."
   type        = string
 }
 
 variable "cloud_run_service" {
-  description = "Name of the Cloud Run service the repo deploys."
+  description = "Name of the Cloud Run service the repo deploys. Set this or cloud_run_job."
   type        = string
+  default     = null
+}
+
+variable "cloud_run_job" {
+  description = "Name of the Cloud Run job the repo deploys. Set this or cloud_run_service."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = (var.cloud_run_job == null) != (var.cloud_run_service == null)
+    error_message = "Set exactly one of cloud_run_service and cloud_run_job."
+  }
 }
 
 variable "vpc_subnetwork" {
@@ -45,6 +57,6 @@ variable "vpc_subnetwork" {
 }
 
 variable "runtime_service_account_id" {
-  description = "Fully qualified ID of the service's runtime service account."
+  description = "Fully qualified ID of the service's or job's runtime service account."
   type        = string
 }

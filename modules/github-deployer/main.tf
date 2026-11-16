@@ -1,5 +1,5 @@
 # Service account a GitHub repo impersonates (via WIF) to push images and
-# deploy one Cloud Run service. It can do nothing else.
+# deploy one Cloud Run service or job. It can do nothing else.
 resource "google_service_account" "this" {
   project      = var.project_id
   account_id   = var.account_id
@@ -21,9 +21,28 @@ resource "google_artifact_registry_repository_iam_member" "writer" {
 }
 
 resource "google_cloud_run_v2_service_iam_member" "developer" {
+  count = var.cloud_run_service != null ? 1 : 0
+
   project  = var.project_id
   location = var.cloud_run_location
   name     = var.cloud_run_service
+  role     = "roles/run.developer"
+  member   = "serviceAccount:${google_service_account.this.email}"
+}
+
+# Keeps the existing services' grants in place (no destroy/create gap that could fail a
+# deploy running during the apply). Remove after RE-22 has been applied.
+moved {
+  from = google_cloud_run_v2_service_iam_member.developer
+  to   = google_cloud_run_v2_service_iam_member.developer[0]
+}
+
+resource "google_cloud_run_v2_job_iam_member" "developer" {
+  count = var.cloud_run_job != null ? 1 : 0
+
+  project  = var.project_id
+  location = var.cloud_run_location
+  name     = var.cloud_run_job
   role     = "roles/run.developer"
   member   = "serviceAccount:${google_service_account.this.email}"
 }
@@ -38,7 +57,7 @@ resource "google_compute_subnetwork_iam_member" "network_user" {
   member     = "serviceAccount:${google_service_account.this.email}"
 }
 
-# Deploying a revision that runs as the runtime SA requires actAs on it.
+# Deploying a revision (or job update) that runs as the runtime SA requires actAs on it.
 resource "google_service_account_iam_member" "act_as_runtime" {
   service_account_id = var.runtime_service_account_id
   role               = "roles/iam.serviceAccountUser"
